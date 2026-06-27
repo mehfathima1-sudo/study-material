@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Academic Command Ledger Engine</title>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-accent: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #38bdf8;
+            --primary-dark: #0284c7;
+            --success: #22c55e;
+            --danger: #f43f5e;
+            --warning: #fbbf24;
+            --gold: #eab308;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); min-height: 100vh; padding: 20px; }
+
+        /* Setup Form Screen */
+        .setup-screen { max-width: 600px; margin: 60px auto; background: var(--bg-surface); padding: 40px; border-radius: 12px; border: 2px solid var(--primary); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
+        .setup-title { font-size: 2rem; color: var(--primary); font-weight: 800; margin-bottom: 20px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .form-control { width: 100%; padding: 12px; background: var(--bg-main); border: 1px solid var(--bg-accent); border-radius: 6px; color: var(--text-main); font-size: 1rem; transition: border 0.2s; }
+        .form-control:focus { outline: none; border-color: var(--primary); }
+
+        /* Application Layout */
+        .app-container { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+        .hidden { display: none !important; }
+
+        /* Sidebar Deck */
+        .sidebar { background: var(--bg-surface); border-radius: 12px; padding: 20px; border: 1px solid var(--bg-accent); height: calc(100vh - 40px); position: sticky; top: 20px; display: flex; flex-direction: column; }
+        .sidebar-header { border-bottom: 2px dashed var(--bg-accent); padding-bottom: 15px; margin-bottom: 15px; position: relative; }
+        .sidebar-title { font-size: 1.1rem; color: var(--primary); font-weight: 800; letter-spacing: 1px; padding-right: 30px; word-break: break-all; }
+        
+        /* Re-login Button Element */
+        .relogin-btn { position: absolute; top: 0; right: 0; background: var(--bg-accent); border: 1px solid var(--text-muted); color: var(--text-main); border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; cursor: pointer; font-weight: bold; transition: all 0.2s; text-transform: uppercase; }
+        .relogin-btn:hover { background: var(--danger); border-color: var(--danger); color: white; }
+
+        .day-selector-container { overflow-y: auto; flex-grow: 1; padding-right: 5px; }
+        .day-btn { width: 100%; padding: 10px 12px; margin-bottom: 8px; background: var(--bg-accent); border: 1px solid transparent; border-radius: 6px; color: var(--text-main); text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; font-size: 0.9rem; }
+        .day-btn:hover { background: #475569; }
+        .day-btn.active { border-color: var(--primary); background: var(--primary-dark); font-weight: bold; }
+        .day-status-badge { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+        .day-status-badge.complete { background: var(--success); }
+
+        /* Main Workspace Arena */
+        .main-content { display: flex; flex-direction: column; gap: 24px; }
+        
+        /* Stats Dashboard Panel */
+        .dashboard-banner { background: var(--bg-surface); border-radius: 12px; padding: 20px; border: 1px solid var(--bg-accent); display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .metric-card { background: var(--bg-main); border: 1px solid var(--bg-accent); border-radius: 8px; padding: 15px; text-align: center; }
+        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .metric-value { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+
+        /* Card Elements */
+        .card { background: var(--bg-surface); border-radius: 12px; padding: 30px; border: 1px solid var(--bg-accent); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
+        .card-header { border-bottom: 2px solid var(--bg-accent); padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 1.6rem; color: var(--primary); font-weight: 800; }
+        
+        .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+        .badge-info { background: #0c4a6e; color: #38bdf8; border: 1px solid #0284c7; }
+        .badge-warn { background: #7c2d12; color: #fb923c; border: 1px solid #ea580c; }
+        
+        /* Ledger Schedule Tables */
+        .ops-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .ops-table th, .ops-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--bg-accent); }
+        .ops-table th { background: var(--bg-main); color: var(--primary); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
+        
+        .time-block-input { font-family: monospace; font-weight: bold; color: var(--success); background: transparent; border: none; border-bottom: 1px solid transparent; width: 100%; font-size: 0.95rem; }
+        .time-block-input:focus { outline: none; border-bottom-color: var(--success); }
+
+        .routine-input { width: 100%; background: transparent; border: none; border-bottom: 1px dashed var(--text-muted); color: var(--text-main); font-size: 0.95rem; padding: 4px 0; }
+        .routine-input:focus { outline: none; border-bottom-color: var(--primary); }
+        .routine-input.task-completed { text-decoration: line-through; color: var(--text-muted); }
+        .routine-input.task-failed { text-decoration: underline wavy var(--danger); color: #fca5a5; }
+
+        /* Status Toggle Buttons */
+        .status-toggle-container { display: flex; gap: 8px; justify-content: center; align-items: center; }
+        .status-btn { background: var(--bg-main); border: 1px solid var(--bg-accent); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: all 0.2s; }
+        .status-btn.done:hover { background: #166534; border-color: var(--success); }
+        .status-btn.pending-fail:hover { background: #991b1b; border-color: var(--danger); }
+        
+        .status-btn.active-done { background: var(--success); border-color: var(--success); color: white; }
+        .status-btn.active-failed { background: var(--danger); border-color: var(--danger); color: white; }
+
+        /* Navigation Controls Group */
+        .nav-control-panel { display: flex; align-items: center; justify-content: space-between; background: var(--bg-main); padding: 20px; border-radius: 8px; border: 1px solid var(--bg-accent); margin-top: 25px; }
+        .lock-warning { font-size: 0.85rem; color: var(--danger); font-weight: bold; text-transform: uppercase; visibility: hidden; }
+        .lock-warning.visible { visibility: visible; }
+
+        /* Quiz Modules Elements */
+        .exam-terminal { margin-top: 30px; background: var(--bg-main); border: 2px solid var(--bg-accent); border-radius: 8px; padding: 25px; }
+        .exam-terminal.locked { border-color: var(--success); background: #022c22; }
+        .exam-terminal.failed-terminal { border-color: var(--danger); background: #2d1a1e; }
+        .exam-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--bg-accent); padding-bottom: 10px; }
+        .exam-q-text { font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; color: var(--text-main); line-height: 1.5; }
+        .options-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 25px; }
+        
+        .option-node { background: var(--bg-surface); border: 1px solid var(--bg-accent); border-radius: 6px; padding: 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; }
+        .option-node:hover { border-color: var(--primary); background: #2d3748; }
+        .option-node.wrong-node { border-color: var(--danger); background: #4c1d24; }
+        .option-node.correct-node { border-color: var(--success); background: #064e3b; }
+        
+        .action-btn { background: var(--primary-dark); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: background 0.2s; }
+        .action-btn:hover { background: var(--primary); }
+        .action-btn:disabled { background: var(--bg-accent); color: var(--text-muted); cursor: not-allowed; }
+
+        .score-display { display: flex; align-items: center; gap: 20px; margin-top: 15px; padding: 15px; background: var(--bg-surface); border-radius: 6px; border: 1px solid var(--bg-accent); }
+        .score-pct { font-size: 2rem; font-weight: 900; }
+        .score-pct.good { color: var(--success); }
+        .score-pct.bad { color: var(--danger); }
+
+        .wrong-review-banner { margin-top: 15px; padding: 15px; background: #4c1d24; border: 1px dashed var(--danger); border-radius: 6px; color: #fca5a5; font-size: 0.9rem; }
+
+        /* Cover & Vault Templates */
+        .cover-wrapper { text-align: center; max-width: 750px; margin: 40px auto; padding: 40px; border: 4px double var(--primary); background: var(--bg-surface); border-radius: 12px; }
+        .cover-title { font-size: 2.8rem; color: var(--primary); font-weight: 900; margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
+        .cover-manifesto { font-style: italic; background: var(--bg-main); padding: 20px; border-radius: 8px; border-left: 4px solid var(--gold); margin: 30px 0; color: var(--text-main); font-weight: 600; line-height: 1.6; }
+        
+        .vault-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 20px; }
+        .vault-cell { background: var(--bg-main); border: 1px solid var(--bg-accent); border-radius: 4px; padding: 10px 5px; text-align: center; }
+        .vault-cell-day { font-size: 0.7rem; color: var(--text-muted); display: block; }
+        .vault-cell-score { font-size: 0.9rem; font-weight: bold; }
+        .vault-cell-score.pass { color: var(--success); }
+        .vault-cell-score.fail { color: var(--danger); }
+        .vault-cell-score.pending { color: var(--text-muted); font-style: italic; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+
+<div class="setup-screen" id="setup-interface">
+    <h1 class="setup-title">System Initialization</h1>
+    <div class="form-group">
+        <label for="user-name">User / Student Name</label>
+        <input type="text" id="user-name" class="form-control" placeholder="Enter full name for validation profile...">
+    </div>
+    <div class="form-group">
+        <label for="course-track">Core Course Track Selection</label>
+        <select id="course-track" class="form-control">
+            <option value="BTECH_CS">B.Tech Computer Science & Engineering (Kannur FYUGP)</option>
+            <option value="BCA">Bachelor of Computer Applications (BCA)</option>
+            <option value="BSC_IT">B.Sc. Information Technology</option>
+            <option value="AI">Artificial Intelligence & Machine Learning (AI & ML)</option>
+            <option value="BBA">Bachelor of Business Administration (BBA)</option>
+            <option value="BCOM">Bachelor of Commerce (B.Com)</option>
+            <option value="BA">Bachelor of Arts (BA)</option>
+            <option value="ACCA">Association of Chartered Certified Accountants (ACCA)</option>
+            <option value="CA">Chartered Accountancy (CA Track)</option>
+            <option value="GEN_ENG">General Engineering & Mathematical Sciences</option>
+        </select>
+    </div>
+    <button class="action-btn" style="width: 100%; margin-top: 10px;" onclick="initializeApplicationEngine()">Deploy Study Framework</button>
+</div>
+
+<div class="app-container hidden" id="app-workspace">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title" id="sidebar-user-tag">COMMAND DECK</div>
+            <button class="relogin-btn" onclick="triggerReloginRoute()" title="Change Course / Sign Out">Exit</button>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: bold; margin-top: 4px;" id="sidebar-course-tag">TRACK VALIDATED</div>
+        </div>
+        <div class="day-selector-container">
+            <button class="day-btn active" id="btn-cover" onclick="renderCover()">📁 FRONT MANIFESTO</button>
+            <div id="dynamic-day-buttons"></div>
+            <button class="day-btn" id="btn-vault" onclick="renderVault()" style="margin-top: 15px; border-top: 1px dashed var(--bg-accent); color: var(--gold);">🥇 PERFORMANCE VAULT</button>
+            <button class="day-btn" onclick="resetSystemMemory()" style="margin-top: 10px; color: var(--danger); font-size:0.8rem; text-align:center;">🔄 RESET PROGRAM DATA</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="dashboard-banner">
+            <div class="metric-card">
+                <div class="metric-label">Completed Exams</div>
+                <div class="metric-value" id="dash-complete">0 / 111</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Global Exam Mean</div>
+                <div class="metric-value" style="color: var(--gold);" id="dash-avg">0.0%</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Total Points Secured</div>
+                <div class="metric-value" id="dash-points">0 / 11100</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">System Performance</div>
+                <div class="metric-value" id="dash-velocity" style="color: var(--success);">STABLE</div>
+            </div>
+        </div>
+        <div id="stage-anchor"></div>
+    </div>
+</div>
+
+<script>
+    const totalDays = 111;
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    const syllabusTracks = {
+        P1: { code: "CORE-MOD-01", title: "Core Track Fundamental Orientation" },
+        P2: { code: "CORE-MOD-02", title: "Analytical Foundations & Methods" },
+        P3: { code: "CORE-MOD-03", title: "Advanced Domain Framework Configurations" },
+        P4: { code: "CORE-SIM-04", title: "Comprehensive High-Velocity Evaluations" }
+    };
+
+    const systematicQuestionBank = [
+        { q: "Which operational factor ensures continuous operational alignment during system architecture upgrades?", a: ["Static tracking isolation modules", "Frequent iteration review protocols", "Manual fallback registry dumps", "Explicit performance data overrides"], c: 1 },
+        { q: "Under strict structure evaluation rules, what ensures optimal throughput speed parameters?", a: ["Limiting historical record storage nodes", "Decoupling operational micro-dependencies", "Re-indexing parallel validation checkpoints", "Enforcing sequential routing locks"], c: 1 },
+        { q: "Which approach is primary for analyzing unexpected error deviation lines across macro-data models?", a: ["Linear variance matrix inspection", "Dynamic configuration rollbacks", "Root-cause baseline verification cycles", "Isolated boundary stress tests"], c: 2 },
+        { q: "What data asset characteristic guarantees value integrity during heavy data transfer intervals?", a: ["Complete structural mapping clarity", "Alphanumeric variable hashing limits", "Immutable operational constraints", "Encapsulated data flow logs"], c: 2 }
+    ];
+
+    let appProfile = { name: "User Profile", course: "BTECH_CS" };
+    let ledgerState = {};
+    const masterDayTimelineConfig = [];
+
+    window.onload = function() {
+        const storedProfile = localStorage.getItem('user_profile_data');
+        const storedState = localStorage.getItem('kannur_ledger_state_v9');
+        
+        if (storedProfile && storedState) {
+            appProfile = JSON.parse(storedProfile);
+            ledgerState = JSON.parse(storedState);
+            bootApplicationWorkspace();
+        }
+    };
+
+    function triggerReloginRoute() {
+        if(confirm("Exit workspace to switch your course selection track? (Your recorded tasks and scores remain stored).")) {
+            document.getElementById('app-workspace').classList.add('hidden');
+            document.getElementById('setup-interface').classList.remove('hidden');
+            document.getElementById('user-name').value = appProfile.name;
+            document.getElementById('course-track').value = appProfile.course;
+        }
+    }
+
+    function initializeApplicationEngine() {
+        const inputName = document.getElementById('user-name').value.trim();
+        const inputCourse = document.getElementById('course-track').value;
+
+        if (!inputName) {
+            alert("Initialization Fault: Profile verification name required.");
+            return;
+        }
+
+        // If switching course track, adapt cleanly but retain historical logs if already matching structurally
+        appProfile = { name: inputName, course: inputCourse };
+        localStorage.setItem('user_profile_data', JSON.stringify(appProfile));
+
+        const storedState = localStorage.getItem('kannur_ledger_state_v9');
+        if (storedState) {
+            ledgerState = JSON.parse(storedState);
+        } else {
+            ledgerState = {};
+            for (let d = 1; d <= totalDays; d++) {
+                ledgerState[d] = {
+                    submitted: false,
+                    selectedAnswer: null,
+                    calculatedScore: 0,
+                    tasks: [
+                        { time: "05:00 AM - 07:00 AM", text: "Morning Session: Core track study alignment and concept mapping.", status: "none" },
+                        { time: "08:30 AM - 03:30 PM", text: "Primary Educational blocks, lectures, or practical domain execution.", status: "none" },
+                        { time: "04:00 PM - 06:00 PM", text: "Afternoon/Evening: Assignments, exercises, and record tracking logs.", status: "none" },
+                        { time: "08:00 PM - 10:00 PM", text: "Night Routine: Objective revision and terminal verification testing.", status: "none" }
+                    ]
+                };
+            }
+            localStorage.setItem('kannur_ledger_state_v9', JSON.stringify(ledgerState));
+        }
+        bootApplicationWorkspace();
+    }
+
+    function bootApplicationWorkspace() {
+        document.getElementById('setup-interface').classList.add('hidden');
+        document.getElementById('app-workspace').classList.remove('hidden');
+        document.getElementById('sidebar-user-tag').innerText = appProfile.name.toUpperCase();
+        
+        const selectedText = document.getElementById('course-track').querySelector(`option[value="${appProfile.course}"]`)?.text || appProfile.course;
+        document.getElementById('sidebar-course-tag').innerText = selectedText;
+
+        masterDayTimelineConfig.length = 0;
+        let processingDate = new Date(2026, 5, 26);
+
+        for (let d = 1; d <= totalDays; d++) {
+            let dayName = daysOfWeek[processingDate.getDay()];
+            let dateString = processingDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            let phaseKey = d >= 16 && d <= 45 ? "P2" : d >= 46 && d <= 85 ? "P3" : d > 85 ? "P4" : "P1";
+            let qIndex = (d - 1) % systematicQuestionBank.length;
+            
+            masterDayTimelineConfig.push({
+                dayNum: d,
+                dayOfWeek: dayName,
+                dateStr: dateString,
+                phase: phaseKey,
+                question: systematicQuestionBank[qIndex]
+            });
+            processingDate.setDate(processingDate.getDate() + 1);
+        }
+
+        buildSidebarNavigationDOM();
+        recalculateDashboardStats();
+        renderCover();
+    }
+
+    function saveState() {
+        localStorage.setItem('kannur_ledger_state_v9', JSON.stringify(ledgerState));
+        recalculateDashboardStats();
+    }
+
+    function updateDayTaskText(dayNum, taskIndex, field, value) {
+        ledgerState[dayNum].tasks[taskIndex][field] = value;
+        localStorage.setItem('kannur_ledger_state_v9', JSON.stringify(ledgerState));
+        verifyNextDayAccessLock(dayNum);
+    }
+
+    function setTaskStatus(dayNum, taskIndex, targetStatus) {
+        ledgerState[dayNum].tasks[taskIndex].status = targetStatus;
+        
+        const inputEl = document.getElementById(`input-text-${dayNum}-${taskIndex}`);
+        if (inputEl) {
+            inputEl.className = "routine-input";
+            if (targetStatus === 'done') inputEl.classList.add('task-completed');
+            if (targetStatus === 'failed') inputEl.classList.add('task-failed');
+        }
+
+        const doneBtn = document.getElementById(`btn-done-${dayNum}-${taskIndex}`);
+        const failBtn = document.getElementById(`btn-fail-${dayNum}-${taskIndex}`);
+        
+        doneBtn.className = "status-btn done" + (targetStatus === 'done' ? " active-done" : "");
+        failBtn.className = "status-btn pending-fail" + (targetStatus === 'failed' ? " active-failed" : "");
+
+        localStorage.setItem('kannur_ledger_state_v9', JSON.stringify(ledgerState));
+        verifyNextDayAccessLock(dayNum);
+    }
+
+    function verifyNextDayAccessLock(dayNum) {
+        const state = ledgerState[dayNum];
+        const allEvaluated = state.tasks.every(t => t.status === 'done' || t.status === 'failed');
+        const nextBtn = document.getElementById(`next-day-btn-${dayNum}`);
+        const warningTxt = document.getElementById(`lock-warning-${dayNum}`);
+
+        if (nextBtn) {
+            if (allEvaluated) {
+                nextBtn.disabled = false;
+                if (warningTxt) warningTxt.classList.remove('visible');
+            } else {
+                nextBtn.disabled = true;
+                if (warningTxt) warningTxt.classList.add('visible');
+            }
+        }
+    }
+
+    function navigateToNextDayEngine(currentDayNum) {
+        const nextDayNum = currentDayNum + 1;
+        if (nextDayNum <= totalDays) {
+            const currentDayTasks = ledgerState[currentDayNum].tasks;
+            const nextDayTasks = ledgerState[nextDayNum].tasks;
+
+            currentDayTasks.forEach(task => {
+                if (task.status === 'failed') {
+                    let exists = nextDayTasks.some(t => t.text === `⚠️ Carry-Over: ${task.text}`);
+                    if (!exists) {
+                        nextDayTasks.unshift({
+                            time: task.time,
+                            text: `⚠️ Carry-Over: ${task.text.replace('⚠️ Carry-Over: ', '')}`,
+                            status: "none"
+                        });
+                    }
+                }
+            });
+
+            saveState();
+            renderDayView(nextDayNum);
+        }
+    }
+
+    function recalculateDashboardStats() {
+        let completeCount = 0;
+        let totalPoints = 0;
+        for (let d = 1; d <= totalDays; d++) {
+            if (ledgerState[d].submitted) {
+                completeCount++;
+                totalPoints += ledgerState[d].calculatedScore;
+            }
+        }
+        document.getElementById('dash-complete').innerText = `${completeCount} / ${totalDays}`;
+        document.getElementById('dash-points').innerText = `${totalPoints} / ${totalDays * 100}`;
+        let calculationAvg = completeCount > 0 ? (totalPoints / (completeCount * 100)) * 100 : 0;
+        document.getElementById('dash-avg').innerText = `${calculationAvg.toFixed(1)}%`;
+
+        for (let d = 1; d <= totalDays; d++) {
+            const badge = document.getElementById(`badge-day-${d}`);
+            if (badge) badge.className = ledgerState[d].submitted ? "day-status-badge complete" : "day-status-badge";
+        }
+    }
+
+    function buildSidebarNavigationDOM() {
+        const rootContainer = document.getElementById('dynamic-day-buttons');
+        rootContainer.innerHTML = "";
+        masterDayTimelineConfig.forEach(config => {
+            const btn = document.createElement('button');
+            btn.className = "day-btn";
+            btn.id = `btn-day-${config.dayNum}`;
+            btn.onclick = () => renderDayView(config.dayNum);
+            btn.innerHTML = `<span>DAY ${String(config.dayNum).padStart(3, '0')} (${config.dayOfWeek.substring(0,3)})</span><div class="day-status-badge" id="badge-day-${config.dayNum}"></div>`;
+            rootContainer.appendChild(btn);
+        });
+    }
+
+    function clearActiveStatus() {
+        document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+    }
+
+    function renderCover() {
+        clearActiveStatus();
+        document.getElementById('btn-cover').classList.add('active');
+        document.getElementById('stage-anchor').innerHTML = `
+            <div class="cover-wrapper">
+                <div class="cover-institution">Strategic Self-Directed Learning Hub</div>
+                <h1 class="cover-title">THE TRANSFORMATION<br>MASTER COMMAND LEDGER</h1>
+                <div class="badge badge-warn" style="font-size:1rem; padding:6px 16px;">Operational Readiness Enabled</div>
+                <div class="cover-manifesto">
+                    "Welcome, ${appProfile.name}. Mark items as Done (✔️) or Not Done (❌). Wrong quiz answers show immediate percentage tracking parameters at the bottom layout."
+                </div>
+                <div style="text-align: left; background: var(--bg-main); padding: 20px; border-radius: 8px; border: 1px solid var(--bg-accent);">
+                    <p style="margin-bottom:10px;"><strong>Validated Profile User:</strong> ${appProfile.name}</p>
+                    <p><strong>Operational Syllabus Track:</strong> ${document.getElementById('course-track').querySelector(`option[value="${appProfile.course}"]`)?.text || appProfile.course}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderDayView(dayNum) {
+        clearActiveStatus();
+        const navBtn = document.getElementById(`btn-day-${dayNum}`);
+        if (navBtn) navBtn.classList.add('active');
+        
+        const config = masterDayTimelineConfig[dayNum - 1];
+        const state = ledgerState[dayNum];
+        const track = syllabusTracks[config.phase];
+
+        let routineRowsHtml = "";
+        state.tasks.forEach((task, index) => {
+            let completedClass = task.status === 'done' ? "task-completed" : task.status === 'failed' ? "task-failed" : "";
+            routineRowsHtml += `
+                <tr>
+                    <td>
+                        <div class="status-toggle-container">
+                            <button id="btn-done-${dayNum}-${index}" title="Mark Complete" class="status-btn done ${task.status === 'done' ? 'active-done' : ''}" onclick="setTaskStatus(${dayNum}, ${index}, 'done')">✓</button>
+                            <button id="btn-fail-${dayNum}-${index}" title="Mark Not Done" class="status-btn pending-fail ${task.status === 'failed' ? 'active-failed' : ''}" onclick="setTaskStatus(${dayNum}, ${index}, 'failed')">✕</button>
+                        </div>
+                    </td>
+                    <td>
+                        <input type="text" class="time-block-input" value="${task.time.replace(/"/g, '&quot;')}" onchange="updateDayTaskText(${dayNum}, ${index}, 'time', this.value)">
+                    </td>
+                    <td>
+                        <input type="text" id="input-text-${dayNum}-${index}" class="routine-input ${completedClass}" value="${task.text.replace(/"/g, '&quot;')}" placeholder="Set task items objectives here..." onchange="updateDayTaskText(${dayNum}, ${index}, 'text', this.value)">
+                    </td>
+                </tr>
+            `;
+        });
+
+        let terminalContentHtml = "";
+        if (!state.submitted) {
+            let optionsHtml = "";
+            config.question.a.forEach((option, idx) => {
+                optionsHtml += `<div class="option-node" onclick="evaluateAnswerNode(${dayNum}, ${idx})"><span>${option}</span></div>`;
+            });
+            terminalContentHtml = `
+                <div class="exam-terminal">
+                    <div class="exam-header"><span style="font-weight:bold; color:var(--gold);">⚡ DAILY SELECTION VERIFICATION TEST</span></div>
+                    <div class="exam-q-text">${config.question.q}</div>
+                    <div class="options-grid">${optionsHtml}</div>
+                </div>`;
+        } else {
+            let isCorrect = state.calculatedScore === 100;
+            let optionsHtml = "";
+            config.question.a.forEach((option, idx) => {
+                let nodeClass = "";
+                if (idx === config.question.c) nodeClass = "correct-node";
+                else if (idx === state.selectedAnswer && !isCorrect) nodeClass = "wrong-node";
+                optionsHtml += `<div class="option-node ${nodeClass}"><span>${option}</span></div>`;
+            });
+
+            let wrongReviewHtml = !isCorrect ? `
+                <div class="wrong-review-banner">
+                    <strong>⚠️ WRONG ANSWER DETECTED:</strong><br>
+                    • You Selected: <em>"${config.question.a[state.selectedAnswer]}"</em><br>
+                    • Correct Target Key: <span style="color:var(--success); font-weight:bold;">"${config.question.a[config.question.c]}"</span>
+                </div>
+            ` : "";
+
+            terminalContentHtml = `
+                <div class="exam-terminal ${isCorrect ? 'locked' : 'failed-terminal'}">
+                    <div class="exam-header">
+                        <span style="font-weight:bold; color:${isCorrect ? 'var(--success)' : 'var(--danger)'};">
+                            ${isCorrect ? '✅ PERFECT EVALUATION METRIC SECURED' : '❌ INCORRECT VERIFICATION MARK RECORDED'}
+                        </span>
+                    </div>
+                    <div class="exam-q-text" style="color:var(--text-muted);">${config.question.q}</div>
+                    <div class="options-grid">${optionsHtml}</div>
+                    <div class="score-display">
+                        <div class="score-pct ${isCorrect ? 'good' : 'bad'}">${state.calculatedScore}%</div>
+                        <div style="border-left:1px solid var(--bg-accent); padding-left:20px;"><p><strong>EOD Score Profile Checked</strong></p></div>
+                    </div>
+                    ${wrongReviewHtml}
+                </div>`;
+        }
+
+        const isLastDay = dayNum === totalDays;
+        const nextButtonHtml = isLastDay 
+            ? `<button class="action-btn" style="background:var(--gold);" onclick="renderVault()">🥇 View Final Vault Index</button>`
+            : `<button class="action-btn" id="next-day-btn-${dayNum}" onclick="navigateToNextDayEngine(${dayNum})">Next Day ➡️</button>`;
+
+        document.getElementById('stage-anchor').innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <span style="font-size:0.85rem; color:var(--primary); font-weight:bold;">CALIBRATED DATELINE: ${config.dateStr}</span>
+                        <h2 class="card-title">DAY ${String(config.dayNum).padStart(3, '0')} — ${config.dayOfWeek.toUpperCase()}</h2>
+                    </div>
+                    <div class="badge badge-info">${track.title}</div>
+                </div>
+                <table class="ops-table">
+                    <thead>
+                        <tr><th style="width:12%; text-align:center;">Action</th><th style="width:24%">Time Frame</th><th style="width:64%">Customizable Checklist Area</th></tr>
+                    </thead>
+                    <tbody>${routineRowsHtml}</tbody>
+                </table>
+                <div class="nav-control-panel">
+                    <span class="lock-warning" id="lock-warning-${dayNum}">⚠️ Cannot proceed: Mark all tasks above as (✓) or (✕) to unlock next day</span>
+                    ${nextButtonHtml}
+                </div>
+                ${terminalContentHtml}
+            </div>
+        `;
+        verifyNextDayAccessLock(dayNum);
+    }
+
+    function evaluateAnswerNode(dayNum, optionIdx) {
+        if (ledgerState[dayNum].submitted) return;
+        
+        const config = masterDayTimelineConfig[dayNum - 1];
+        const state = ledgerState[dayNum];
+        
+        state.selectedAnswer = optionIdx;
+        state.submitted = true;
+        state.calculatedScore = (optionIdx === config.question.c) ? 100 : 0;
+        
+        saveState();
+        renderDayView(dayNum);
+    }
+
+    function renderVault() {
+        clearActiveStatus();
+        document.getElementById('btn-vault').classList.add('active');
+        let cellsHtml = "";
+        for (let d = 1; d <= totalDays; d++) {
+            let state = ledgerState[d];
+            let scoreText = "PENDING";
+            let scoreClass = "vault-cell-score pending";
+            if (state.submitted) {
+                scoreText = state.calculatedScore + "%";
+                scoreClass = state.calculatedScore === 100 ? "vault-cell-score pass" : "vault-cell-score fail";
+            }
+            cellsHtml += `<div class="vault-cell"><span class="vault-cell-day">D-${String(d).padStart(3,'0')}</span><span class="${scoreClass}">${scoreText}</span></div>`;
+        }
+        document.getElementById('stage-anchor').innerHTML = `<div class="card"><h2 class="card-title" style="color:var(--gold);">🥇 PERFORMANCE ENGINE DATA VAULT</h2><div class="vault-grid">${cellsHtml}</div></div>`;
+    }
+
+    function resetSystemMemory() {
+        if (confirm("Clear all profile data and local storage state parameters?")) {
+            localStorage.removeItem('user_profile_data');
+            localStorage.removeItem('kannur_ledger_state_v9');
+            location.reload();
+        }
+    }
+</script>
+</body>
+</html>
